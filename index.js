@@ -46,18 +46,25 @@ function main(){
     }
 }
 
+function getSeparator(dir) {
+    var separator = "/";
+    if(dir.indexOf("\\") > -1){
+        separator = "\\";
+    }
+    if(dir[dir.length-1] === separator) {
+        dir=dir.substring(0,dir.length-1);
+    }
+    return [dir,separator];
+}
+
 function doAction(actionName,argVal){
     if(actionName === "--fName") {
         processFile(argVal);
     } else if(actionName === "--dir") {
-        var separator = "/";
-        if(argVal.indexOf("\\") > -1){
-            separator = "\\";
-        }
-        if(argVal[argVal.length-1] === separator) {
-            argVal=argVal.substring(0,argVal.length-1);
-        }
-        var dirlist = {};
+        var ret       = getSeparator(argVal);
+        argVal        = ret[0];
+        var separator = ret[1];
+        var dirlist   = {};
         processDir(argVal,dirlist,separator,true);
         displayAsTree("",dirlist);
     } else {
@@ -91,6 +98,10 @@ function processFile(fName) {
     });
 }
 
+function displayAsTreeWrapper(tree) {
+    displayAsTree("",tree);
+}
+
 function displayAsTree(spaces,tree){
     for(key in tree) {
         if(ignoreTxt !== undefined && key.indexOf(ignoreTxt) > -1) {
@@ -100,6 +111,11 @@ function displayAsTree(spaces,tree){
             displayAsTree(spaces+"    ",tree[key]);
         }
     }
+}
+
+function processLinesWrapper(lines,ignr) {
+    ignoreTxt = ignr;
+    return processLines(lines);
 }
 
 function processLines(lines) {
@@ -127,6 +143,16 @@ function processLines(lines) {
     return root;
 }
 
+function processDirWrapper(dir,ignr) {
+    ignoreTxt     = ignr;
+    var ret       = getSeparator(dir);
+    argVal        = ret[0];
+    var separator = ret[1];
+    var dirlist   = {};
+    processDir(dir,dirlist,separator,true);
+    return dirlist;
+}
+
 function processDir(dir,curr,separator,isFirst) {
     var files;
     var i;
@@ -146,4 +172,8 @@ function processDir(dir,curr,separator,isFirst) {
     }
 }
 
-main();
+if(process.argv.length >= 3){
+    main();
+} else {
+    module.exports = {processLinesWrapper:processLinesWrapper,processDirWrapper:processDirWrapper,displayAsTreeWrapper:displayAsTreeWrapper};
+}

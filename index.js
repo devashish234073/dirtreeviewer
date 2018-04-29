@@ -1,11 +1,11 @@
 var fs = require("fs");
 
-var ignoreTxt;
-
 function main(){
     var MAXLEN = process.argv.length;
     var actionName;
     var argVal;
+    var ignoreTxt;
+    
     if(MAXLEN>=3){
         for(var i=2;i<MAXLEN;i++) {
             var arg = process.argv[i];
@@ -40,7 +40,7 @@ function main(){
                 }
             }
         }
-        doAction(actionName,argVal);
+        doAction(actionName,argVal,ignoreTxt);
     } else {
         showUsage();
     }
@@ -57,15 +57,15 @@ function getSeparator(dir) {
     return [dir,separator];
 }
 
-function doAction(actionName,argVal){
+function doAction(actionName,argVal,ignr){
     if(actionName === "--fName") {
-        processFile(argVal);
+        processFile(argVal,ignr);
     } else if(actionName === "--dir") {
         var ret       = getSeparator(argVal);
         argVal        = ret[0];
         var separator = ret[1];
         var dirlist   = {};
-        processDir(argVal,dirlist,separator,true);
+        processDir(argVal,dirlist,separator,true,ignr);
         displayAsTree("",dirlist);
     } else {
         print("Unable to interpret arguments provided!");
@@ -86,39 +86,49 @@ function showUsage() {
     process.exit(0);
 }
 
-function processFile(fName) {
+function processFile(fName,ignr) {
     fs.readFile(fName,(err,data)=>{
         if(err) {
             print(`Error reading '${fName}'\n${err}`);
         } else {
             var lines=String(data).split("\n");
-            var tree=processLines(lines);
+            var tree=processLines(lines,ignr);
             displayAsTree("",tree);
         }
     });
 }
 
-function displayAsTreeWrapper(tree) {
-    displayAsTree("",tree);
+function objectify(arrEachElementsWithColon) {
+    var obj = [];
+    for(var i=0;i<arrEachElementsWithColon.length;i++) {
+        var arr = arrEachElementsWithColon[i].split(":");
+        if(!isNaN(parseInt(arr[0]))) {
+            if(obj[parseInt(arr[0])] === undefined) {
+                obj[parseInt(arr[0])] = [];
+            }
+            obj[parseInt(arr[0])].push(arr[1]);
+        }
+    }
+    return obj;
 }
 
-function displayAsTree(spaces,tree){
-    for(key in tree) {
-        if(ignoreTxt !== undefined && key.indexOf(ignoreTxt) > -1) {
-            //ignore
-        } else {
-            print(spaces+">"+key);
-            displayAsTree(spaces+"    ",tree[key]);
-        }
+function displayAsTreeWrapper(parsed) {
+    displayAsTree("",parsed);
+}
+
+function displayAsTree(spaces,parsed){
+    for(key in parsed) {
+        print(spaces+">"+key);
+        displayAsTree(spaces+"    ",parsed[key]);
     }
 }
 
 function processLinesWrapper(lines,ignr) {
     ignoreTxt = ignr;
-    return processLines(lines);
+    return processLines(lines,ignr);
 }
 
-function processLines(lines) {
+function processLines(lines,ignr) {
     if(lines.length === 0){
         print("No content to process!");
     } else {
@@ -131,12 +141,16 @@ function processLines(lines) {
         for(i=0;i<lines.length;i++){
             line = lines[i].trim();
             arr  = line.split(".");
-            curr = root;
-            for(j=0;j<arr.length;j++){
-                if(curr[arr[j]] === undefined){
-                    curr[arr[j]] = {};
+            if(arr.length>0) {
+                if(arr[arr.length-1].indexOf(ignr) == -1) {
+                    curr = root;
+                    for(j=0;j<arr.length;j++){
+                        if(curr[arr[j]] === undefined){
+                            curr[arr[j]] = {};
+                        }
+                        curr = curr[arr[j]];
+                    }
                 }
-                curr = curr[arr[j]];
             }
         }
     }
@@ -149,21 +163,23 @@ function processDirWrapper(dir,ignr) {
     argVal        = ret[0];
     var separator = ret[1];
     var dirlist   = {};
-    processDir(dir,dirlist,separator,true);
+    processDir(dir,dirlist,separator,true,ignr);
     return dirlist;
 }
 
-function processDir(dir,curr,separator,isFirst) {
+function processDir(dir,curr,separator,isFirst,ignr) {
     var files;
     var i;
     try {
         files = fs.readdirSync(dir);
         for(i=0;i<files.length;i++){
-            if(curr[files[i]]===undefined){
-                curr[files[i]]={};
+            if(files[i].indexOf(ignr) === -1) {
+                if(curr[files[i]] === undefined){
+                    curr[files[i]]={};
+                }
+                newDir = dir+separator+files[i];
+                processDir(newDir,curr[files[i]],separator,false,ignr);
             }
-            newDir = dir+separator+files[i];
-            processDir(newDir,curr[files[i]],separator,false);
         }
     } catch(exception){
         if(isFirst){
